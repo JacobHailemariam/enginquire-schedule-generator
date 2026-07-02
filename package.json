@@ -1,0 +1,9 @@
+{
+  "name": "enginquire-schedule-generator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-personalized first-year schedule generator for EngInQuire",
+  "engines": {
+    "node": ">=18"
+  }
+}
