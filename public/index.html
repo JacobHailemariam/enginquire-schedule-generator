@@ -141,20 +141,33 @@
   .principles .p .pt{font-size:15px;font-weight:700;margin-bottom:5px;}
   .principles .p .pd{font-size:11px;color:rgba(42,29,20,0.66);line-height:1.45;}
 
-  .tt{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:6px;}
-  .tt th{background:var(--ink);color:var(--paper);font-family:var(--fdisp);
-    font-size:12px;font-weight:600;padding:9px 4px;}
-  .tt th.tcol{width:44px;background:var(--ink);}
-  .tt td.time{font-family:var(--fmono);font-size:9px;color:rgba(42,29,20,0.5);
-    text-align:right;padding:2px 5px 0 0;vertical-align:top;background:var(--paper-2);
-    border:0.5px solid var(--ink-line);height:26px;}
-  .tt td.slot{border:0.5px solid var(--ink-line);position:relative;padding:0;height:26px;}
-  .ev{position:absolute;left:1.5px;right:1.5px;border-radius:4px;padding:4px 6px;
-    overflow:hidden;color:#241708;display:flex;flex-direction:column;justify-content:center;}
-  .ev .lab{font-size:11px;font-weight:700;line-height:1.12;}
-  .ev .sub{font-family:var(--fmono);font-size:8px;opacity:0.72;margin-top:1px;}
+  .weekgrid{display:flex;margin-top:6px;border-radius:2px;overflow:hidden;border:0.5px solid var(--ink-line);}
+  .wg-timecol{flex:none;width:44px;display:flex;flex-direction:column;}
+  .wg-timecol .wg-corner{height:27px;background:var(--ink);}
+  .wg-timecol .wg-hour{font-family:var(--fmono);font-size:9px;color:rgba(42,29,20,0.5);
+    background:var(--paper-2);border-top:0.5px solid var(--ink-line);
+    text-align:right;padding:2px 5px 0 0;box-sizing:border-box;}
+  .wg-main{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .wg-header{display:grid;height:27px;}
+  .wg-header div{background:var(--ink);color:var(--paper);font-family:var(--fdisp);
+    font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;
+    border-left:0.5px solid rgba(243,233,216,0.14);}
+  .wg-header div:first-child{border-left:none;}
+  .wg-body{position:relative;display:grid;}
+  .wg-cell{border-top:0.5px solid var(--ink-line);border-left:0.5px solid var(--ink-line);}
+  .wg-cell.c0{border-left:none;}
+  /* events live on their own overlay grid so they never disturb the ruled background's flow */
+  .wg-events{position:absolute;inset:0;display:grid;pointer-events:none;}
+  .ev{margin:2px;border-radius:5px;padding:6px 8px;overflow:hidden;color:#241708;
+    display:flex;flex-direction:column;justify-content:center;pointer-events:auto;}
+  .ev .lab{font-size:12px;font-weight:700;line-height:1.18;}
+  .ev .sub{font-family:var(--fmono);font-size:8.5px;opacity:0.72;margin-top:2px;}
+  /* sub-hour blocks are only one row tall — tighten them so the label stays clean */
+  .ev.short{padding:3px 8px;}
+  .ev.short .lab{line-height:1.1;}
+  .ev.short .sub{margin-top:1px;}
   .ev.fixed{box-shadow:inset 0 0 0 1.5px rgba(0,0,0,0.18);}
-  .ev.fixed .lab{font-family:var(--fmono);font-size:10.5px;letter-spacing:0.01em;}
+  .ev.fixed .lab{font-family:var(--fmono);font-size:11px;letter-spacing:0.01em;}
   .weeknote{font-family:var(--fmono);font-size:10px;color:#9C7A3A;margin:0 0 8px;letter-spacing:0.04em;}
   .legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:14px;}
   .legend span{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(42,29,20,0.72);
@@ -272,7 +285,10 @@
 const DAYS=['Mon','Tue','Wed','Thu','Fri'];
 const DAYFULL={Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday'};
 const HOURS=[]; for(let h=7;h<=21;h++) HOURS.push(h);
-const ROW=26;
+const GRID_START=7, GRID_END=22, SLOT_PX=22; // px per HALF-HOUR row (1h block = 44px)
+const TOTAL_SLOTS=(GRID_END-GRID_START)*2;
+// half-hour slot index since GRID_START (rounded defensively in case a time isn't exactly on a 30-min mark)
+const slotOf=t=>Math.round((t-GRID_START)*2);
 
 const CATS={
   Class:{c:'var(--c-class)',label:'Class'}, Study:{c:'var(--c-study)',label:'Study / Review'},
@@ -321,27 +337,54 @@ function buildTimetable(classes, plan){
   classes.forEach(c=>ev[c.day].push({start:c.start,end:c.end,category:'Class',label:c.course,fixed:true}));
   DAYS.forEach(d=>(plan.days[d]||[]).forEach(b=>ev[d].push({...b,fixed:false})));
 
-  let h='<table class="tt"><tr><th class="tcol">TIME</th>'+DAYS.map(d=>`<th>${DAYFULL[d]}</th>`).join('')+'</tr>';
-  for(const hr of HOURS){
-    h+='<tr>';
-    h+=`<td class="time">${timeLabel(hr)}</td>`;
-    for(const d of DAYS){
-      const starts=ev[d].filter(e=>e.start>=hr&&e.start<hr+1);
-      let inner='';
-      for(const e of starts){
-        const top=(e.start-hr)*ROW;
-        const height=(e.end-e.start)*ROW-3;
-        const col=CATS[e.category]?CATS[e.category].c:'var(--c-free)';
-        const sub = e.fixed ? '' : `<span class="sub">${fmt(e.start)}–${fmt(e.end)}</span>`;
-        inner+=`<div class="ev ${e.fixed?'fixed':''}" style="top:${top+1.5}px;height:${height}px;background:${col}">
-          <span class="lab">${e.label}</span>${sub}</div>`;
-      }
-      h+=`<td class="slot">${inner}</td>`;
-    }
-    h+='</tr>';
+  const nDays=DAYS.length;
+  const cols=`repeat(${nDays},1fr)`;
+  const rows=`repeat(${TOTAL_SLOTS},${SLOT_PX}px)`;
+
+  // Time-label column: one label per hour, each spanning 2 half-hour rows (SLOT_PX*2)
+  let timeCol='<div class="wg-corner"></div>';
+  for(const hr of HOURS) timeCol+=`<div class="wg-hour" style="height:${SLOT_PX*2}px">${timeLabel(hr)}</div>`;
+
+  // Day-name header row
+  let header=`<div class="wg-header" style="grid-template-columns:${cols}">`
+    +DAYS.map(d=>`<div>${DAYFULL[d]}</div>`).join('')+'</div>';
+
+  // LAYER 1 — background ruled cells. With an explicit row template of exactly
+  // TOTAL_SLOTS rows, these 150 cells auto-flow to fill it exactly (nDays × TOTAL_SLOTS),
+  // and because the event overlay is absolutely positioned it never steals a cell here,
+  // so no phantom implicit rows are created.
+  let cells='';
+  for(let s=0;s<TOTAL_SLOTS;s++){
+    for(let c=0;c<nDays;c++) cells+=`<div class="wg-cell${c===0?' c0':''}"></div>`;
   }
-  h+='</table>';
-  return h;
+
+  // LAYER 2 — event boxes on their own overlay grid with identical tracks, so they
+  // line up pixel-for-pixel with the background while staying out of its auto-flow.
+  // Each box spans grid-row start→end computed from its real time, so its footprint
+  // always equals its duration — it cannot bleed into a neighbouring row.
+  let boxes='';
+  DAYS.forEach((d,ci)=>{
+    ev[d].forEach(e=>{
+      const r1=slotOf(e.start)+1, r2=slotOf(e.end)+1;
+      const short=(e.end-e.start)<1;                 // sub-hour block: one row tall
+      const col=CATS[e.category]?CATS[e.category].c:'var(--c-free)';
+      // A 30-min row can't fit label + time without clipping, and the time is already
+      // obvious from the row position — so short blocks show the label only.
+      const sub = (e.fixed || short) ? '' : `<span class="sub">${fmt(e.start)}–${fmt(e.end)}</span>`;
+      boxes+=`<div class="ev ${e.fixed?'fixed':''} ${short?'short':''}" style="grid-column:${ci+1};grid-row:${r1} / ${r2};background:${col}">
+        <span class="lab">${e.label}</span>${sub}</div>`;
+    });
+  });
+
+  return `<div class="weekgrid">
+    <div class="wg-timecol">${timeCol}</div>
+    <div class="wg-main">${header}
+      <div class="wg-body" style="grid-template-columns:${cols};grid-template-rows:${rows}">
+        ${cells}
+        <div class="wg-events" style="grid-template-columns:${cols};grid-template-rows:${rows}">${boxes}</div>
+      </div>
+    </div>
+  </div>`;
 }
 
 function legendFor(plan){
