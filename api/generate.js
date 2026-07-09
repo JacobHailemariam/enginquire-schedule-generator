@@ -48,37 +48,106 @@ function describeClasses(classes) {
   return DAYS.map((d) => `${d}: ${byDay[d].length ? byDay[d].join(', ') : 'no classes'}`).join('\n');
 }
 
-function buildPrompt(classes, considerations) {
+// Convert a one-way commute in minutes to clean 0.5-hour steps so blocks land on the grid.
+// Convert a one-way commute in minutes to clean 0.5-hour steps so blocks land on the grid.
+// Rounds UP to the nearest half-hour (a 15-min ride still gets a 0.5h block, a 75-min
+// ride gets 1.5h, etc.) — same rule as before, just written to cover any option you add
+// later without needing a new branch each time.
+function commuteHours(min) {
+  const m = Number(min) || 0;
+  if (m <= 0) return 0;
+  return Math.ceil(m / 30) * 0.5;
+}
+
+// Turn the structured answers into plain-English scheduling instructions for the model.
+function describePreferences(p) {
+  const lines = [];
+
+  const cH = commuteHours(p.commute);
+  if (p.housing === 'off' && cH > 0) {
+    lines.push(
+      `- COMMUTE: The student lives OFF campus with about a ${cH}-hour commute EACH WAY. ` +
+      `On every weekday that has at least one class, add a "Commute" block of exactly ${cH}h ` +
+      `ending when the FIRST class starts, and another "Commute" block of exactly ${cH}h ` +
+      `starting when the LAST class ends. Both commute blocks MUST be the same length. ` +
+      `Directly before the morning commute, add a "Prep" block of 0.5h (getting ready) so the ` +
+      `student's wake-up time is visible. The earliest block may start as early as 5:00 if needed.`
+    );
+  } else {
+    lines.push(
+      `- COMMUTE: The student lives ON campus (walking distance) — do NOT add any "Commute" blocks. ` +
+      `Use a short 0.5h "Prep" block in the morning; the first block can start close to the first class.`
+    );
+  }
+
+  const dayStart = p.dayStart || 'any';
+  if (dayStart === '8') {
+    lines.push(`- START: Avoid scheduling flexible blocks (Study, Gym, Project, Free) before 8:00 — keep early mornings light unless a class or the commute requires an earlier start.`);
+  } else if (dayStart === '9') {
+    lines.push(`- START: Avoid scheduling flexible blocks before 9:00 wherever the fixed classes allow it.`);
+  } else {
+    lines.push(`- START: The day can start as early as the classes (and any commute/prep) require.`);
+  }
+
+  const dayEnd = Number(p.dayEnd) || 22;
+  const endLabel = dayEnd >= 23 ? '23:00 (11 PM)' : dayEnd <= 21 ? '21:00 (9 PM)' : '22:00 (10 PM)';
+  lines.push(`- END: Wind the day down by about ${endLabel}. Place the "WindDown" block ending near then, and schedule no work blocks after it.${dayEnd >= 23 ? ' Later evening Study/Project blocks are fine for this night owl.' : ''}`);
+
+  const gym = Number(p.gym) || 0;
+  lines.push(gym > 0
+    ? `- GYM: Schedule EXACTLY ${gym} "Gym" block(s) across the week (one per day, on ${gym} different days), each ~1h.`
+    : `- GYM: Not a focus — include at most 1 short "Gym" block, or none.`);
+
+  const study = { after: 'Place "Study" review blocks right after lectures whenever possible.',
+    evening: 'Batch most "Study" blocks into the evenings.',
+    spread: 'Spread "Study" blocks evenly through the day.' };
+  lines.push(`- STUDY: ${study[p.study] || study.after}`);
+
+  const social = { minimal: 'Keep "Club"/social time minimal — prioritize academics (0-1 Club blocks).',
+    some: 'Include a few "Club" and social "Free" blocks across the week (about 2-3).',
+    active: 'Include several "Club" and social "Free" blocks across the week (4+).' };
+  lines.push(`- SOCIAL: ${social[p.social] || social.some}`);
+
+  return lines.join('\n');
+}
+
+function buildPrompt(classes, body) {
   const classText = describeClasses(classes);
+  const prefs = describePreferences(body || {});
+  const notes = (body && body.considerations) ? body.considerations : '';
+  const endHour = Math.min(23, Math.max(21, Number(body && body.dayEnd) || 22));
   return `You are a study-schedule planner for a first-year engineering student.
 
 The student's FIXED class times (these are locked — never move, remove, or invent classes):
 ${classText}
 
-The student's preferences, in their own words:
-"${considerations || 'No specific preferences given.'}"
+The student's structured preferences (follow these precisely):
+${prefs}
 
-Your job: fill the student's week (Mon-Fri, 7:00 to 22:00) with FLEXIBLE blocks arranged AROUND the fixed classes. Never overlap a fixed class. Honor the preferences (e.g. if they dislike mornings, keep early slots light; if they want gym 4x, schedule 4 gym blocks).
+The student's own extra notes:
+"${notes || 'None given.'}"
+
+Your job: fill the student's week (Mon-Fri, 5:00 to ${endHour}:00) with FLEXIBLE blocks arranged AROUND the fixed classes. Never overlap a fixed class, and follow the structured preferences above exactly (commute lengths, start/end times, gym count, study rhythm, social level).
 
 Allowed flexible categories ONLY: ${FLEX_CATEGORIES.join(', ')}.
-Guidance:
+General guidance:
 - "Prep" = a short morning routine before the day starts.
-- "Commute" ~1h before the first class and after the last class each weekday that has classes.
-- "Study" = review/problem sets; place some right after lectures when possible.
+- "Study" = review/problem sets.
 - "Lunch" = a midday break around 12:00-13:00.
-- "Gym", "Project", "Club", "Free" per their preferences.
-- "WindDown" = an evening block to close the day.
-- Keep it realistic: don't fill every minute; leave some Free.
+- "Project", "Free" = building time and genuine rest per the preferences.
+- "WindDown" = an evening block to close the day, ending by about ${endHour}:00.
+- Keep it realistic: don't fill every minute; leave some "Free".
 
 Return ONLY valid JSON, no prose, no markdown fences. Schema:
 {
   "days": {
-    "Mon": [ {"start": 7, "end": 8, "category": "Prep", "label": "Morning Prep"}, ... ],
+    "Mon": [ {"start": 6.5, "end": 7, "category": "Prep", "label": "Morning Prep"}, ... ],
     "Tue": [ ... ], "Wed": [ ... ], "Thu": [ ... ], "Fri": [ ... ]
   }
 }
 Rules for the JSON:
-- start/end are numbers in 24h decimal (e.g. 13.5 = 1:30pm), between 7 and 22.
+- start/end are numbers in 24h decimal (e.g. 13.5 = 1:30pm), between 5 and ${endHour}.
+- Use 0.5-hour increments only (e.g. 6, 6.5, 7 ... never 6.25).
 - category MUST be one of: ${FLEX_CATEGORIES.join(', ')}.
 - Do NOT include the fixed classes in your output — only the flexible blocks around them.
 - Blocks within a day must not overlap each other.`;
@@ -99,7 +168,7 @@ function validatePlan(plan, classes) {
     for (const b of blocks) {
       if (typeof b.start !== 'number' || typeof b.end !== 'number') continue;
       if (b.end <= b.start) continue;
-      if (b.start < 7 || b.end > 22) continue;
+      if (b.start < 5 || b.end > 23) continue;
       if (!FLEX_CATEGORIES.includes(b.category)) continue;
       // reject if it overlaps a fixed class
       const clashes = fixedByDay[day].some(
@@ -211,12 +280,12 @@ module.exports = async (req, res) => {
     // ---- generate ----
     let plan;
     try {
-      const raw = await callGemini(apiKey, buildPrompt(classes, considerations));
+      const raw = await callGemini(apiKey, buildPrompt(classes, body));
       plan = validatePlan(raw, classes);
     } catch (e) {
       // One retry, then give up gracefully
       try {
-        const raw = await callGemini(apiKey, buildPrompt(classes, considerations));
+        const raw = await callGemini(apiKey, buildPrompt(classes, body));
         plan = validatePlan(raw, classes);
       } catch (e2) {
         res.status(502).json({ error: 'The planner had trouble. Try again in a moment.' });
