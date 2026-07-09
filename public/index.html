@@ -259,9 +259,70 @@
       <div class="field"><label for="semester">Semester</label>
         <select id="semester"><option value="fall">Fall 2026</option><option value="winter">Winter 2027</option></select></div>
     </div>
+
     <div class="field-row">
-      <div class="field full"><label for="considerations">How do you want your week to feel?</label>
-        <textarea id="considerations" placeholder="e.g. I'm not a morning person, I want to hit the gym 4x a week, study right after each lecture, and keep Friday evenings free."></textarea>
+      <div class="field"><label for="housing">Where do you live?</label>
+        <select id="housing">
+          <option value="on">On campus / walking distance</option>
+          <option value="off" selected>Off campus (I commute)</option>
+        </select></div>
+      <div class="field" id="commuteField"><label for="commute">Commute, each way</label>
+        <select id="commute">
+          <option value="15">Under 15 min</option>
+          <option value="30" selected>About 30 min</option>
+          <option value="45">About 45 min</option>
+          <option value="60">About an hour</option>
+          <option value="75">1 hour & 15 mins</option>
+          <option value="90">1 hour & half</option>
+          <option value="105">1 hour & 45 mins</option>
+          <option value="120">About 2 hours</option>
+        </select></div>
+    </div>
+
+    <div class="field-row">
+      <div class="field"><label for="dayStart">Earliest you want to start</label>
+        <select id="dayStart">
+          <option value="any" selected>Whenever my classes need</option>
+          <option value="8">Nothing before 8 AM</option>
+          <option value="9">Nothing before 9 AM</option>
+        </select></div>
+      <div class="field"><label for="dayEnd">Wrap up your day by</label>
+        <select id="dayEnd">
+          <option value="21">Around 9 PM</option>
+          <option value="22" selected>Around 10 PM</option>
+          <option value="23">Around 11 PM (night owl)</option>
+        </select></div>
+    </div>
+
+    <div class="field-row">
+      <div class="field"><label for="gym">Gym per week</label>
+        <select id="gym">
+          <option value="0">Not a priority</option>
+          <option value="2">2× a week</option>
+          <option value="3" selected>3× a week</option>
+          <option value="4">4× a week</option>
+          <option value="5">5+ a week</option>
+        </select></div>
+      <div class="field"><label for="study">Study rhythm</label>
+        <select id="study">
+          <option value="after" selected>Right after each lecture</option>
+          <option value="evening">Batched in the evenings</option>
+          <option value="spread">Spread evenly through the day</option>
+        </select></div>
+    </div>
+
+    <div class="field-row">
+      <div class="field full"><label for="social">Clubs &amp; social time</label>
+        <select id="social">
+          <option value="minimal">Keep it minimal — focus on academics</option>
+          <option value="some" selected>A few club / social blocks</option>
+          <option value="active">Active — lots of clubs &amp; social</option>
+        </select></div>
+    </div>
+
+    <div class="field-row">
+      <div class="field full"><label for="considerations">Anything else? (optional)</label>
+        <textarea id="considerations" placeholder="e.g. keep Friday evenings free for basketball, no early classes on Monday, I like a long lunch on Wednesdays."></textarea>
         <div class="hint">Plain words are fine — the more you say, the better the fit.</div></div>
     </div>
     <button class="go" id="goBtn">Generate my Field Guide</button>
@@ -284,11 +345,6 @@
 <script>
 const DAYS=['Mon','Tue','Wed','Thu','Fri'];
 const DAYFULL={Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday'};
-const HOURS=[]; for(let h=7;h<=21;h++) HOURS.push(h);
-const GRID_START=7, GRID_END=22, SLOT_PX=22; // px per HALF-HOUR row (1h block = 44px)
-const TOTAL_SLOTS=(GRID_END-GRID_START)*2;
-// half-hour slot index since GRID_START (rounded defensively in case a time isn't exactly on a 30-min mark)
-const slotOf=t=>Math.round((t-GRID_START)*2);
 
 const CATS={
   Class:{c:'var(--c-class)',label:'Class'}, Study:{c:'var(--c-study)',label:'Study / Review'},
@@ -301,6 +357,12 @@ const CATS={
 const blockSel=document.getElementById('block');
 for(let n=1;n<=10;n++){const o=document.createElement('option');o.value=n;o.textContent='Block '+n;blockSel.appendChild(o);}
 
+// Show the commute question only when the student lives off campus.
+const housingSel=document.getElementById('housing');
+const commuteField=document.getElementById('commuteField');
+function syncCommute(){ commuteField.style.visibility = housingSel.value==='off' ? 'visible' : 'hidden'; }
+housingSel.addEventListener('change', syncCommute); syncCommute();
+
 const $=id=>document.getElementById(id);
 const fmt=t=>{const h=Math.floor(t);const m=t%1?'30':'00';const ap=h>=12?'pm':'am';
   const hh=h>12?h-12:(h===0?12:h);return `${hh}:${m}${ap}`;};
@@ -308,8 +370,13 @@ const timeLabel=h=>{const ap=h>=12?'PM':'AM';const hh=h>12?h-12:h;return `${hh} 
 
 let msgTimer;
 async function generate(){
+  const housing=$('housing').value;
   const payload={firstName:$('firstName').value.trim(),lastName:$('lastName').value.trim(),
     email:$('email').value.trim(),block:$('block').value,semester:$('semester').value,
+    housing,
+    commute: housing==='off' ? parseInt($('commute').value,10) : 0,
+    dayStart:$('dayStart').value, dayEnd:parseInt($('dayEnd').value,10),
+    gym: parseInt($('gym').value,10), study:$('study').value, social:$('social').value,
     considerations:$('considerations').value.trim()};
   $('err').style.display='none';
   if(!payload.firstName||!payload.lastName) return showErr('Enter your first and last name.');
@@ -339,22 +406,35 @@ function buildTimetable(classes, plan){
 
   const nDays=DAYS.length;
   const cols=`repeat(${nDays},1fr)`;
-  const rows=`repeat(${TOTAL_SLOTS},${SLOT_PX}px)`;
 
-  // Time-label column: one label per hour, each spanning 2 half-hour rows (SLOT_PX*2)
+  // Dynamic window. The grid normally runs 7 AM–10 PM, but it stretches to fit the real
+  // blocks: down to 6 AM for an early commute/prep, and up to 11 PM for a late wind-down.
+  let earliest=7, latest=22;
+  DAYS.forEach(d=>ev[d].forEach(e=>{ if(e.start<earliest) earliest=e.start; if(e.end>latest) latest=e.end; }));
+  const gridStart=Math.max(6, Math.min(7, Math.floor(earliest)));
+  const gridEnd=Math.min(23, Math.max(22, Math.ceil(latest)));
+  const totalSlots=(gridEnd-gridStart)*2;
+  const hours=[]; for(let h=gridStart;h<gridEnd;h++) hours.push(h);
+  // Auto-size each half-hour row so the whole grid fills a consistent height regardless
+  // of how many rows we ended up with (30 rows → 22px; more rows → slightly shorter).
+  const slotPx=Math.max(18, Math.min(22, Math.round(660/totalSlots)));
+  const slotAt=t=>Math.round((t-gridStart)*2);
+  const rows=`repeat(${totalSlots},${slotPx}px)`;
+
+  // Time-label column: one label per hour, each spanning 2 half-hour rows (slotPx*2)
   let timeCol='<div class="wg-corner"></div>';
-  for(const hr of HOURS) timeCol+=`<div class="wg-hour" style="height:${SLOT_PX*2}px">${timeLabel(hr)}</div>`;
+  for(const hr of hours) timeCol+=`<div class="wg-hour" style="height:${slotPx*2}px">${timeLabel(hr)}</div>`;
 
   // Day-name header row
   let header=`<div class="wg-header" style="grid-template-columns:${cols}">`
     +DAYS.map(d=>`<div>${DAYFULL[d]}</div>`).join('')+'</div>';
 
   // LAYER 1 — background ruled cells. With an explicit row template of exactly
-  // TOTAL_SLOTS rows, these 150 cells auto-flow to fill it exactly (nDays × TOTAL_SLOTS),
+  // totalSlots rows, these cells auto-flow to fill it exactly (nDays × totalSlots),
   // and because the event overlay is absolutely positioned it never steals a cell here,
   // so no phantom implicit rows are created.
   let cells='';
-  for(let s=0;s<TOTAL_SLOTS;s++){
+  for(let s=0;s<totalSlots;s++){
     for(let c=0;c<nDays;c++) cells+=`<div class="wg-cell${c===0?' c0':''}"></div>`;
   }
 
@@ -365,7 +445,7 @@ function buildTimetable(classes, plan){
   let boxes='';
   DAYS.forEach((d,ci)=>{
     ev[d].forEach(e=>{
-      const r1=slotOf(e.start)+1, r2=slotOf(e.end)+1;
+      const r1=slotAt(e.start)+1, r2=slotAt(e.end)+1;
       const short=(e.end-e.start)<1;                 // sub-hour block: one row tall
       const col=CATS[e.category]?CATS[e.category].c:'var(--c-free)';
       // A 30-min row can't fit label + time without clipping, and the time is already
