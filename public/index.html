@@ -280,21 +280,6 @@
     </div>
 
     <div class="field-row">
-      <div class="field"><label for="dayStart">Earliest you want to start</label>
-        <select id="dayStart">
-          <option value="any" selected>Whenever my classes need</option>
-          <option value="8">Nothing before 8 AM</option>
-          <option value="9">Nothing before 9 AM</option>
-        </select></div>
-      <div class="field"><label for="dayEnd">Wrap up your day by</label>
-        <select id="dayEnd">
-          <option value="21">Around 9 PM</option>
-          <option value="22" selected>Around 10 PM</option>
-          <option value="23">Around 11 PM (night owl)</option>
-        </select></div>
-    </div>
-
-    <div class="field-row">
       <div class="field"><label for="gym">Gym per week</label>
         <select id="gym">
           <option value="0">Not a priority</option>
@@ -387,7 +372,6 @@ async function generate(){
     email:$('email').value.trim(),block:$('block').value,semester:$('semester').value,
     housing,
     commute: housing==='off' ? parseInt($('commute').value,10) : 0,
-    dayStart:$('dayStart').value, dayEnd:parseInt($('dayEnd').value,10),
     gym: parseInt($('gym').value,10), study:$('study').value, social:$('social').value,
     considerations:$('considerations').value.trim()};
   $('err').style.display='none';

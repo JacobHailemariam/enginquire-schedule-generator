@@ -82,18 +82,8 @@ function describePreferences(p) {
     );
   }
 
-  const dayStart = p.dayStart || 'any';
-  if (dayStart === '8') {
-    lines.push(`- START: Avoid scheduling flexible blocks (Study, Gym, Project, Free) before 8:00 — keep early mornings light unless a class or the commute requires an earlier start.`);
-  } else if (dayStart === '9') {
-    lines.push(`- START: Avoid scheduling flexible blocks before 9:00 wherever the fixed classes allow it.`);
-  } else {
-    lines.push(`- START: The day can start as early as the classes (and any commute/prep) require.`);
-  }
-
-  const dayEnd = Number(p.dayEnd) || 22;
-  const endLabel = dayEnd >= 23 ? '23:00 (11 PM)' : dayEnd <= 21 ? '21:00 (9 PM)' : '22:00 (10 PM)';
-  lines.push(`- END: Wind the day down by about ${endLabel}. Place the "WindDown" block ending near then, and schedule no work blocks after it.${dayEnd >= 23 ? ' Later evening Study/Project blocks are fine for this night owl.' : ''}`);
+  lines.push(`- START: The day can start as early as the classes (and any commute/prep) require.`);
+  lines.push(`- END: Wind the day down by about 22:00 (10 PM). Place the "WindDown" block ending near then, and schedule no work blocks after it.`);
 
   const gym = Number(p.gym) || 0;
   lines.push(gym > 0
@@ -117,7 +107,7 @@ function buildPrompt(classes, body) {
   const classText = describeClasses(classes);
   const prefs = describePreferences(body || {});
   const notes = (body && body.considerations) ? body.considerations : '';
-  const endHour = Math.min(23, Math.max(21, Number(body && body.dayEnd) || 22));
+  const endHour = 22;
   return `You are a study-schedule planner for a first-year engineering student.
 
 The student's FIXED class times (these are locked — never move, remove, or invent classes):
