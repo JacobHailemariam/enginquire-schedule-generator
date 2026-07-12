@@ -4,6 +4,25 @@ Generates a personalized **Field Guide / Daily Blueprint** — a print-ready, mu
 
 Designed to be linked directly from something like Linktree — students land on the form, fill it out, and get a shareable page they can save as a PDF ("Save as PDF" triggers the browser print dialog, styled for letter-size print).
 
+## Preview
+
+Sample output for Block 2, Fall/Winter — every class time is real, everything else is generated around it.
+
+<table>
+<tr>
+<td><img src="docs/screenshots/01-cover.png" width="400" alt="Cover page"></td>
+<td><img src="docs/screenshots/02-the-system.png" width="400" alt="Key / legend page"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/03-weekly-rhythm-fall.png" width="400" alt="Fall weekly rhythm grid"></td>
+<td><img src="docs/screenshots/04-weekly-rhythm-winter.png" width="400" alt="Winter weekly rhythm grid"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/05-five-pillars.png" width="400" alt="Five pillars page"></td>
+<td><img src="docs/screenshots/06-contact.png" width="400" alt="Contact page"></td>
+</tr>
+</table>
+
 ## How it works
 
 1. **Fixed classes are never AI-generated.** They come straight from [api/blocks.json](api/blocks.json) (10 blocks × fall/winter semesters) and are looked up by block number — the model never invents or moves a class.
