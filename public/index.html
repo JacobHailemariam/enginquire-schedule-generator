@@ -368,6 +368,18 @@ const fmt=t=>{const h=Math.floor(t);const m=t%1?'30':'00';const ap=h>=12?'pm':'a
   const hh=h>12?h-12:(h===0?12:h);return `${hh}:${m}${ap}`;};
 const timeLabel=h=>{const ap=h>=12?'PM':'AM';const hh=h>12?h-12:h;return `${hh} ${ap}`;};
 
+const WEB3FORMS_KEY='fcfb534c-f869-4345-8af0-77c25db94abb';
+function logLead(firstName,lastName,email,block,semester){
+  fetch('https://api.web3forms.com/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    access_key:WEB3FORMS_KEY,
+    subject:`New Blueprint lead — Block ${block} (${semester})`,
+    from_name:'EngInQuire Generator',
+    name:`${firstName} ${lastName}`,
+    email,
+    message:`Block ${block}, ${semester}. Generated a schedule.`
+  })}).catch(()=>{});
+}
+
 let msgTimer;
 async function generate(){
   const housing=$('housing').value;
@@ -388,6 +400,7 @@ async function generate(){
     const res=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     const data=await res.json();
     if(!res.ok) throw new Error(data.error||'Something went wrong.');
+    logLead(payload.firstName,payload.lastName,payload.email,payload.block,payload.semester);
     buildGuide(data,payload);
   }catch(e){ showErr(e.message); }
   finally{ $('goBtn').disabled=false; $('loading').classList.remove('show'); clearInterval(msgTimer); }

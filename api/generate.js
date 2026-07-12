@@ -6,7 +6,9 @@
 //   2. Look up the student's REAL fixed class times from blocks.json
 //   3. Ask Gemini to arrange only the FLEXIBLE blocks around those fixed classes
 //   4. Validate Gemini's JSON against a strict schema before returning it
-//   5. Log the lead (name + email + block) via Web3Forms
+//
+// Lead logging (Web3Forms) happens client-side in public/index.html, since
+// Web3Forms' free plan blocks server-to-server calls.
 //
 // The model never invents class times. Fixed classes come from our data;
 // the model only fills the gaps. Code validates before anything is trusted.
@@ -220,27 +222,6 @@ async function callGemini(key, prompt) {
   return JSON.parse(text.replace(/^```json\s*/i, '').replace(/```\s*$/i, ''));
 }
 
-async function logLead({ firstName, lastName, email, block, semester }) {
-  const key = process.env.WEB3FORMS_KEY;
-  if (!key) return; // logging is best-effort; never blocks the generate
-  try {
-    await fetch('https://api.web3forms.com/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        access_key: key,
-        subject: `New Blueprint lead — Block ${block} (${semester})`,
-        from_name: 'EngInQuire Generator',
-        name: `${firstName} ${lastName}`,
-        email,
-        message: `Block ${block}, ${semester}. Generated a schedule.`,
-      }),
-    });
-  } catch (e) {
-    // swallow — lead logging must never break the student's result
-  }
-}
-
 // ---- Handler ------------------------------------------------------------
 
 module.exports = async (req, res) => {
@@ -292,9 +273,6 @@ module.exports = async (req, res) => {
         return;
       }
     }
-
-    // ---- log lead (best effort, non-blocking on failure) ----
-    await logLead({ firstName, lastName, email, block, semester });
 
     res.status(200).json({
       block: String(block),

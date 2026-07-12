@@ -45,7 +45,11 @@ This is how student name + email + block lands in enginquire7@gmail.com.
 
 1. Go to **https://web3forms.com**
 2. Enter enginquire7@gmail.com, get an **Access Key** emailed to you.
-3. Copy it. (If you skip this, generation still works — you just won't collect leads.)
+3. Paste it into the `WEB3FORMS_KEY` constant near the top of the `<script>` block in
+   `public/index.html`. Web3Forms' free plan blocks server-to-server calls, so this key
+   lives in the client-side JS and the browser submits leads directly — that's expected,
+   the key only allows submissions into your inbox. (If you skip this, generation still
+   works — you just won't collect leads.)
 
 ### 3. Put the folder on GitHub
 
@@ -61,7 +65,6 @@ This is how student name + email + block lands in enginquire7@gmail.com.
    | Name              | Value                          |
    |-------------------|--------------------------------|
    | `GEMINI_API_KEY`  | your `AIza...` key from step 1 |
-   | `WEB3FORMS_KEY`   | your Web3Forms key (optional)  |
 
 4. Click **Deploy**. Wait ~1 minute.
 5. Vercel gives you a URL like `https://enginquire-generator.vercel.app`.
