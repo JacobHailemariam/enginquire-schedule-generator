@@ -411,7 +411,7 @@ function buildTimetable(classes, plan){
   // blocks: down to 6 AM for an early commute/prep, and up to 11 PM for a late wind-down.
   let earliest=7, latest=22;
   DAYS.forEach(d=>ev[d].forEach(e=>{ if(e.start<earliest) earliest=e.start; if(e.end>latest) latest=e.end; }));
-  const gridStart=Math.max(6, Math.min(7, Math.floor(earliest)));
+  const gridStart=Math.max(5, Math.min(7, Math.floor(earliest)));
   const gridEnd=Math.min(23, Math.max(22, Math.ceil(latest)));
   const totalSlots=(gridEnd-gridStart)*2;
   const hours=[]; for(let h=gridStart;h<gridEnd;h++) hours.push(h);
@@ -609,5 +609,15 @@ $('pdfBtn').addEventListener('click',()=>window.print());
 $('againBtn').addEventListener('click',()=>{$('result').classList.remove('show');
   document.querySelector('.hero').scrollIntoView({behavior:'smooth'});});
 </script>
+
+<script>
+  window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/speed-insights/script.js"></script>
+
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>
