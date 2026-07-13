@@ -151,8 +151,9 @@
   .wg-header{display:grid;height:27px;}
   .wg-header div{background:var(--ink);color:var(--paper);font-family:var(--fdisp);
     font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;
-    border-left:0.5px solid rgba(243,233,216,0.14);}
+    white-space:nowrap;overflow:hidden;border-left:0.5px solid rgba(243,233,216,0.14);}
   .wg-header div:first-child{border-left:none;}
+  .wg-header .d-abbr{display:none;}
   .wg-body{position:relative;display:grid;}
   .wg-cell{border-top:0.5px solid var(--ink-line);border-left:0.5px solid var(--ink-line);}
   .wg-cell.c0{border-left:none;}
@@ -211,6 +212,31 @@
     .sec-title{font-size:30px;} .cover-lede,.contact-lede{max-width:100%;}
     .keygrid{grid-template-columns:1fr;} .principles{grid-template-columns:1fr;}
     .cover-meta{flex-wrap:wrap;gap:18px;}
+
+    /* On phones the fixed letter-page aspect-ratio collapses the page height and
+       overflow:hidden clips the schedule. Let every page grow to fit its content,
+       flow the padded content normally, and tighten the margins so nothing is cramped. */
+    .app{padding:20px 14px 70px;}
+    .guide{gap:18px;}
+    .page,.page.dark{aspect-ratio:auto;height:auto;min-height:0;}
+    .pad{position:static;inset:auto;padding:26px 20px;}
+    .cover-mid,.principles,.foot,.contact-big,.contact-foot{margin-top:24px;}
+    .cover-lede{max-width:100%;} .sec-intro{max-width:100%;}
+    .pillar .pd{max-width:100%;}
+    .contact-lede{max-width:100%;} .contact-foot .cq{max-width:100%;}
+
+    /* Keep the weekly grid legible and aligned. Short day names keep the header on one
+       line (long names wrap and misalign the grid); the per-block time subtitle is
+       dropped since it overflows the narrow columns and the row position already shows it. */
+    .wg-timecol{width:30px;}
+    .wg-timecol .wg-hour{font-size:8px;padding-right:3px;}
+    .wg-header .d-full{display:none;}
+    .wg-header .d-abbr{display:inline;}
+    .wg-header div{font-size:10px;}
+    .ev{margin:1px;padding:3px 4px;} .ev .lab{font-size:9.5px;line-height:1.1;}
+    .ev .sub{display:none;}
+    .ev.fixed .lab{font-size:9px;}
+    .foot .fk{font-size:7px;} .foot .fv{font-size:9px;}
   }
 
   @page{size:letter;margin:0;}
@@ -422,9 +448,11 @@ function buildTimetable(classes, plan){
   let timeCol='<div class="wg-corner"></div>';
   for(const hr of hours) timeCol+=`<div class="wg-hour" style="height:${slotPx*2}px">${timeLabel(hr)}</div>`;
 
-  // Day-name header row
+  // Day-name header row. Ship both the full and short name so CSS can swap to the
+  // short one on mobile — long names like "Wednesday" wrap on a phone, which grows
+  // the header taller than the time-column corner and knocks the grid out of alignment.
   let header=`<div class="wg-header" style="grid-template-columns:${cols}">`
-    +DAYS.map(d=>`<div>${DAYFULL[d]}</div>`).join('')+'</div>';
+    +DAYS.map(d=>`<div><span class="d-full">${DAYFULL[d]}</span><span class="d-abbr">${d}</span></div>`).join('')+'</div>';
 
   // LAYER 1 — background ruled cells. With an explicit row template of exactly
   // totalSlots rows, these cells auto-flow to fill it exactly (nDays × totalSlots),
